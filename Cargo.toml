@@ -1,0 +1,7 @@
+[package]
+name = "twm"
+version = "0.0.1"
+authors = ["Karl Zylinski <karl@zylinski.se>"]
+
+[dependencies]
+libc = "0.1"
