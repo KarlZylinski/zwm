@@ -1,138 +1,14 @@
-use libc::{c_int, c_uint, c_void, c_char, c_long, c_ushort, wchar_t};
-use libc::types::os::arch::extra::{HANDLE, DWORD};
+extern crate libc;
+mod internal;
+use math::*;
+use self::internal::*;
 use std::mem;
-pub const WS_VISIBLE: DWORD = 0x10000000;
-pub const WS_EX_TOOLWINDOW: DWORD = 0x00000080;
-pub const WS_POPUP: DWORD = 0x80000000;
-pub const CS_OWNDC: DWORD = 0x0020;
-pub const PM_REMOVE: c_uint = 0x0001;
-pub const SW_HIDE: c_int = 0x0000;
-pub const NULLPTR: *mut c_void = 0 as *mut c_void;
-pub type HWND = HANDLE;
-pub type WORD = c_ushort;
-pub type HMENU = *mut c_void;
-pub type HINSTANCE = *mut c_void;
-pub type LPVOID = *mut c_void;
-pub type LPCSTR = *const c_char;
-pub type WPARAM = c_uint;
-pub type LPARAM = c_long;
-pub type LRESULT = c_long;
-pub type LONG = c_long;
-pub type BOOL = c_int;
-pub type WCHAR = wchar_t;
-pub type LPCWSTR = *const WCHAR;
-pub type WNDPROC = Option<unsafe extern "system" fn(
-    HWND, c_uint, WPARAM,LPARAM,
-) -> LRESULT>;
 
-#[repr(C)]
-pub struct HICON_ {
-    pub i: c_int,
-}
-pub type HICON = *mut HICON_;
-
-#[repr(C)]
-pub struct HCURSOR_ {
-    pub i: c_int,
-}
-pub type HCURSOR = *mut HCURSOR_;
-
-#[repr(C)]
-pub struct HBRUSH_ {
-    pub i: c_int,
-}
-pub type HBRUSH = *mut HBRUSH_;
-
-#[repr(C)] #[derive(Copy)] #[allow(non_snake_case)]
-pub struct WNDCLASSEXA {
-    pub cbSize: c_uint,
-    pub style: c_uint,
-    pub lpfnWndProc: WNDPROC,
-    pub cbClsExtra: c_int,
-    pub cbWndExtra: c_int,
-    pub hInstance: HINSTANCE,
-    pub hIcon: HICON,
-    pub hCursor: HCURSOR,
-    pub hbrBackground: HBRUSH,
-    pub lpszMenuName: LPCSTR,
-    pub lpszClassName: LPCSTR,
-    pub hIconSm: HICON
-}
-
-impl Default for WNDCLASSEXA {
-    fn default () -> WNDCLASSEXA {
-        WNDCLASSEXA {
-            cbSize: mem::size_of::<WNDCLASSEXA>() as u32,
-            style: 0,
-            lpfnWndProc: Some(DefWindowProcA),
-            cbClsExtra: 0,
-            cbWndExtra: 0,
-            hInstance: 0 as HINSTANCE,
-            hIcon: 0 as HICON,
-            hCursor: 0 as HCURSOR,
-            hbrBackground: 0 as HBRUSH,
-            lpszMenuName: 0 as LPCSTR,
-            lpszClassName: 0 as LPCSTR,
-            hIconSm: 0 as HICON
-        }
-    }
-}
-
-impl Clone for WNDCLASSEXA { fn clone(&self) -> WNDCLASSEXA { *self } }
-
-#[repr(C)] #[derive(Clone, Copy, Debug)]
-pub struct POINT {
-    pub x: c_long,
-    pub y: c_long
-}
-
-#[repr(C)] #[derive(Clone, Copy, Debug)] #[allow(non_snake_case)]
-pub struct MSG {
-    pub hwnd: HWND,
-    pub message: c_uint,
-    pub wParam: WPARAM,
-    pub lParam: LPARAM,
-    pub time: DWORD,
-    pub pt: POINT,
-}
-
-pub type LPMSG = *mut MSG;
-
-impl Default for MSG {
-    fn default () -> MSG {
-        MSG {
-            hwnd: NULLPTR,
-            message: 0,
-            wParam: 0,
-            lParam: 0,
-            time: 0,
-            pt: POINT { x: 0, y: 0 }
-        }
-    }
-}
-
-#[link(name = "user32")]
-extern "stdcall" {
-    pub fn CreateWindowExA(dwExStyle: DWORD, lpClassName: LPCSTR, lpWindowName: LPCSTR, dwStyle: DWORD,
-        x: c_int, y: c_int, nWidth: c_int, nHeight: c_int, hWndParent: HWND, hMenu: HMENU,
-        hInstance: HINSTANCE, lpParam: LPVOID) -> HWND;
-    pub fn RegisterClassExA(lpWndClass: *const WNDCLASSEXA) -> WORD;
-    pub fn GetModuleHandleA(lpModuleName: LPCSTR) -> HINSTANCE;
-}
-
-#[link(name = "user32")] #[allow(dead_code)]
-extern "system" {
-    pub fn DefWindowProcA(hWnd: HWND, Msg: c_uint, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
-
-    pub fn GetLastError() -> DWORD;
-    
-    pub fn PeekMessageA(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: c_uint, wMsgFilterMax: c_uint, wRemoveMsg: c_uint) -> BOOL;
-    pub fn TranslateMessage(lpmsg: *const MSG) -> BOOL;
-    pub fn DispatchMessageA(lpmsg: *const MSG) -> LRESULT;
-    pub fn FindWindowA(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND;
-    pub fn IsWindow(hWnd: HWND) -> BOOL;
-    pub fn ShowWindow(hWnd: HWND, nCmdShow: c_int) -> BOOL;
-}
+macro_rules! def(
+    ($t:ident) => {
+        $t { ..Default::default() }
+    };
+);
 
 pub fn winstr(str: &[u8]) -> Winstr {
     return str.as_ptr() as Winstr;
@@ -140,3 +16,169 @@ pub fn winstr(str: &[u8]) -> Winstr {
 
 pub type Winstr = *const i8;
 pub const NULLSTR: Winstr = 0 as Winstr;
+pub type WindowHandle = HWND;
+
+pub fn create_window(name: &[u8], size: &Vector2) -> WindowHandle {
+    let winstr_name = winstr(name);
+    const STYLE: libc::types::os::arch::extra::DWORD = WS_POPUP | WS_VISIBLE;
+
+    unsafe {
+        let instance = GetModuleHandleA(NULLSTR);
+
+        if instance == NULLPTR {
+            panic!("Failed to create register window class.");
+        }
+
+        let wc = WNDCLASSEXA {
+            hInstance: instance,
+            lpszClassName: winstr_name,
+            style: CS_OWNDC,
+            ..Default::default()
+        };
+
+        let class_atom = RegisterClassExA(&wc) as Winstr;
+
+        if class_atom == 0 as *const i8 {
+            panic!("Failed to create register window class.");
+        }
+
+        let hwnd = CreateWindowExA(WS_EX_TOOLWINDOW, class_atom, winstr_name, STYLE, 0, 0, size.x, size.y,
+                                   NULLPTR, NULLPTR, instance, NULLPTR);
+
+        if hwnd == NULLPTR {
+            panic!("Failed to create window.");
+        }
+
+        return hwnd;
+    }
+}
+
+pub fn is_window(handle: WindowHandle) -> bool {
+    unsafe {
+        return IsWindow(handle) != 0;
+    }
+}
+
+pub enum WindowVisibility {
+    Visible,
+    Hidden
+}
+
+pub fn find_window(class_name: &str, window_name: Option<&str>) -> Option<WindowHandle> {
+    unsafe {
+        let hwnd = FindWindowA(
+            winstr(class_name.as_bytes()),
+            window_name.map_or(NULLSTR, |name| winstr(name.as_bytes()))
+        );
+
+        return if hwnd == NULLPTR {
+            None
+        } else {
+            Some(hwnd)
+        }
+    }
+}
+
+pub fn set_window_visibility(handle: WindowHandle, visibility: WindowVisibility) {
+    unsafe {
+        ShowWindow(handle, match visibility {
+            WindowVisibility::Visible => SW_SHOW,
+            WindowVisibility::Hidden => SW_HIDE
+        });
+    }
+}
+
+pub fn get_desktop_window() -> WindowHandle {
+    unsafe {
+        return GetDesktopWindow();
+    }
+}
+
+pub fn get_window_rect(handle: WindowHandle) -> Rect {
+    unsafe {
+        let mut desktop_rect = def!(RECT);
+        GetWindowRect(handle, &mut desktop_rect);
+
+        return Rect {
+            left: desktop_rect.left,
+            right: desktop_rect.right,
+            top: desktop_rect.top,
+            bottom: desktop_rect.bottom
+        }
+    }
+}
+
+pub fn process_events() {
+    unsafe {
+        let mut msg = MSG {
+            ..Default::default()
+        };
+
+        while PeekMessageA(&mut msg, NULLPTR, 0, 0, PM_REMOVE) != 0 {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+}
+
+pub fn set_desktop_work_area(rect: &Rect) {
+    unsafe {
+        let mut win_rect = RECT {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom
+        };
+
+        SystemParametersInfoA(SPI_SETWORKAREA, 0, &mut win_rect as *mut _ as PVOID, SPIF_SENDCHANGE);
+    }
+}
+
+pub fn set_window_position_and_size(window_handle: WindowHandle, position: &Vector2, size: &Vector2) {
+    unsafe {
+        SetWindowPos(window_handle, NULLPTR, position.x, position.y, size.x, size.y, 0);
+    }
+}
+
+pub fn get_all_current_windows(all_windows: &mut Vec<WindowHandle>)
+{
+    unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let windows: &mut Vec<WindowHandle> = mem::transmute(lparam);
+
+        if IsWindowVisible(hwnd) == 0 {
+            return TRUE;
+        }
+
+        if GetWindowLongA(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW as u32 != 0 {
+            return TRUE;
+        }
+
+        let mut hwnd_try = GetAncestor(hwnd, GA_ROOTOWNER);
+        let mut hwnd_walk = NULLPTR;
+
+        loop {
+            if hwnd_walk == hwnd_try {
+                break;
+            }
+
+            hwnd_walk = hwnd_try;
+            hwnd_try = GetLastActivePopup(hwnd_walk);
+
+            if IsWindowVisible(hwnd_try) == TRUE {
+                break;
+            }
+        }
+
+        if hwnd_walk != hwnd {
+            return TRUE;
+        }
+
+        windows.push(hwnd);
+        return TRUE;
+    };
+
+    unsafe {
+        let lparam: LPARAM = mem::transmute(all_windows);
+        EnumWindows(Some(callback), lparam);
+    }
+}
