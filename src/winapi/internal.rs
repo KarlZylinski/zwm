@@ -18,6 +18,12 @@ pub type LPCWSTR = *const WCHAR;
 pub const WS_VISIBLE: DWORD = 0x10000000;
 pub const WS_EX_TOOLWINDOW: DWORD = 0x00000080;
 pub const WS_POPUP: DWORD = 0x80000000;
+pub const WS_CAPTION: DWORD = 0x00C00000;
+pub const WS_THICKFRAME: DWORD = 0x00040000;
+pub const WS_MINIMIZE: DWORD = 0x20000000;
+pub const WS_MAXIMIZE: DWORD = 0x01000000;
+pub const WS_SYSMENU: DWORD = 0x00080000;
+pub const WM_NCHITTEST: DWORD = 0x0084;
 pub const CS_OWNDC: DWORD = 0x0020;
 pub const PM_REMOVE: c_uint = 0x0001;
 pub const SW_HIDE: c_int = 0x0000;
@@ -29,6 +35,8 @@ pub const NULLPTR: *mut c_void = 0 as *mut c_void;
 pub const GA_ROOTOWNER: c_uint = 0x0003;
 pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
+pub const GWL_STYLE: c_int = -16;
+pub const HTCLIENT: LRESULT = 1;
 pub type WNDPROC = Option<unsafe extern "system" fn(
     HWND, c_uint, WPARAM,LPARAM,
 ) -> LRESULT>;
@@ -154,4 +162,6 @@ extern "system" {
     pub fn SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, X: c_int, Y: c_int, cx: c_int, cy: c_int, uFlags: c_uint) -> BOOL;
     pub fn GetAncestor(hWnd: HWND, gaFlags: c_uint) -> HWND;
     pub fn GetLastActivePopup(hWnd: HWND) -> HWND;
+    pub fn GetWindowLongPtrA(hWnd: HWND, nIndex: c_int) -> c_long;
+    pub fn SetWindowLongPtrA(hWnd: HWND, nIndex: c_int, dwNewLong: c_long) -> c_long;
 }

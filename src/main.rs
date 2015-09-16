@@ -22,13 +22,18 @@ fn main() {
     };
 
     match primary_window {
-        Some(window) => set_window_position_and_size(window, &Vector2::new(0, 0), &primary_window_size), _ => {}
+        Some(window) => {
+            remove_window_border(window);
+            set_window_position_and_size(window, &Vector2::new(0, 0), &primary_window_size);
+        }, _ => {}
     }
     
     let auxiliary_window_size = Vector2::new(desktop_size.x - primary_window_size.x, desktop_size.y / auxiliary_windows.len() as i32);
 
     for i in 0..auxiliary_windows.len()  {
-        set_window_position_and_size(auxiliary_windows[i], &Vector2::new(primary_window_size.x, auxiliary_window_size.y * i as i32), &auxiliary_window_size);
+        let window_handle = auxiliary_windows[i];
+        set_window_position_and_size(window_handle, &Vector2::new(primary_window_size.x, auxiliary_window_size.y * i as i32), &auxiliary_window_size);
+        remove_window_border(window_handle);
     }
 
     loop {
@@ -45,7 +50,7 @@ fn main() {
 fn hide_explorer() {
     match find_window("Progman", Some("Program Manager")) {
         Some(handle) => set_window_visibility(handle, WindowVisibility::Hidden),
-        _ => {}
+        _ => {}mod
     };
 
     match find_window("Shell_TrayWnd", None) {

@@ -1,4 +1,5 @@
 extern crate libc;
+use libc::{c_uint};
 mod internal;
 use math::*;
 use self::internal::*;
@@ -18,6 +19,15 @@ pub type Winstr = *const i8;
 pub const NULLSTR: Winstr = 0 as Winstr;
 pub type WindowHandle = HWND;
 
+/*unsafe extern "system" fn window_proc(window_handle: WindowHandle, msg: c_uint, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    return match msg {
+        WM_NCHITTEST => {
+            HTCLIENT
+        }
+        _ => DefWindowProcA(window_handle, msg, wparam, lparam)
+    }
+}*/
+
 pub fn create_window(name: &[u8], size: &Vector2) -> WindowHandle {
     let winstr_name = winstr(name);
     const STYLE: libc::types::os::arch::extra::DWORD = WS_POPUP | WS_VISIBLE;
@@ -33,6 +43,7 @@ pub fn create_window(name: &[u8], size: &Vector2) -> WindowHandle {
             hInstance: instance,
             lpszClassName: winstr_name,
             style: CS_OWNDC,
+            //lpfnWndProc: Some(window_proc),
             ..Default::default()
         };
 
@@ -105,6 +116,14 @@ pub fn get_window_rect(handle: WindowHandle) -> Rect {
             top: desktop_rect.top,
             bottom: desktop_rect.bottom
         }
+    }
+}
+
+pub fn remove_window_border(handle: WindowHandle) {
+    unsafe {
+        let current_style = GetWindowLongPtrA(handle, GWL_STYLE) as u32;
+        let new_style = current_style & !(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
+        SetWindowLongPtrA(handle, GWL_STYLE, new_style as i32);
     }
 }
 
