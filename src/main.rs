@@ -3,6 +3,7 @@ mod math;
 use math::*;
 mod winapi;
 use winapi::*;
+use winapi::key::*;
 
 fn main() {
     hide_explorer();
@@ -10,6 +11,15 @@ fn main() {
     set_desktop_work_area(&desktop_rect);
     let desktop_size = desktop_rect.size();
     let main_window_handle = create_window(b"ZWM", &desktop_size);
+
+    let hotkey_handler = |key: VirtualKey| {
+        println!("{:?}", key as u32);
+    };
+
+    setup_keyboard_hook(&hotkey_handler);
+    if !register_hot_key(None, 1337, ModifierKey::Alt as u32, VirtualKey::L) {
+        println!("fail");
+    }
     let mut all_windows: Vec<WindowHandle> = Vec::new();
     get_all_current_windows(&mut all_windows);
     let primary_window_size = Vector2::new(desktop_size.x / 2, desktop_size.y);
@@ -30,7 +40,7 @@ fn main() {
     
     let auxiliary_window_size = Vector2::new(desktop_size.x - primary_window_size.x, desktop_size.y / auxiliary_windows.len() as i32);
 
-    for i in 0..auxiliary_windows.len()  {
+    for i in 0..auxiliary_windows.len() {
         let window_handle = auxiliary_windows[i];
         set_window_position_and_size(window_handle, &Vector2::new(primary_window_size.x, auxiliary_window_size.y * i as i32), &auxiliary_window_size);
         remove_window_border(window_handle);
@@ -50,7 +60,7 @@ fn main() {
 fn hide_explorer() {
     match find_window("Progman", Some("Program Manager")) {
         Some(handle) => set_window_visibility(handle, WindowVisibility::Hidden),
-        _ => {}mod
+        _ => {}
     };
 
     match find_window("Shell_TrayWnd", None) {

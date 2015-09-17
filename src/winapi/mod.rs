@@ -1,6 +1,16 @@
+/*
+This is a layer between the internal winapi ffi (internal.rs) and the rest of the application. It exists to:
+- Separate winapi unsafeness from the rest of the rust code.
+- Create some commonly used utility for this application.
+
+This is not a rust-winapi wrapper, it contains loads of stuff specific to this application.
+*/
+
 extern crate libc;
-use libc::{c_uint};
+use libc::{c_uint, c_int, c_void};
 mod internal;
+pub mod key;
+use self::key::*;
 use math::*;
 use self::internal::*;
 use std::mem;
@@ -19,14 +29,102 @@ pub type Winstr = *const i8;
 pub const NULLSTR: Winstr = 0 as Winstr;
 pub type WindowHandle = HWND;
 
-/*unsafe extern "system" fn window_proc(window_handle: WindowHandle, msg: c_uint, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    return match msg {
-        WM_NCHITTEST => {
-            HTCLIENT
+unsafe extern "system" fn window_proc(window_handle: WindowHandle, msg: c_uint, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    /*return match msg {
+        WM_KEYDOWN => {
+            if msg == VirtualKey::Kkk as u32 {
+                println!("LOL");
+                return 0;
+            }
+
+            return DefWindowProcA(window_handle, msg, wparam, lparam);
         }
-        _ => DefWindowProcA(window_handle, msg, wparam, lparam)
+        _ => {
+            return DefWindowProcA(window_handle, msg, wparam, lparam);
+        }
+    }*/
+    return DefWindowProcA(window_handle, msg, wparam, lparam);
+}
+
+
+// Move these things into a Window struct?
+static mut WIN_KEY_DOWN: bool = false;
+static mut LOW_LEVEL_KEYBOARD_HOOK: usize = 0;
+//static mut HOTKEY_CALLBACK: Option<Fn(VirtualKey)> = None;
+
+unsafe extern "system" fn low_level_keyboard_proc(code: c_int, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let default_retval = || -> LRESULT {
+        return CallNextHookEx(LOW_LEVEL_KEYBOARD_HOOK as HHOOK, code, wparam, lparam);
+    };
+
+    let is_win_key = |virtual_key: u32| -> bool {
+        return virtual_key == VirtualKey::LeftWin as u32 || virtual_key == VirtualKey::RightWin as u32
+    };
+
+    if code < 0 || code != HC_ACTION {
+        return default_retval();
     }
-}*/
+
+    let keyboard_info: &mut KBDLLHOOKSTRUCT = mem::transmute(lparam);
+
+    return match wparam {
+        WM_KEYDOWN => {
+            let is_win_key = is_win_key(keyboard_info.vkCode);
+
+            if !is_win_key && WIN_KEY_DOWN {
+                /*match HOTKEY_CALLBACK {
+                    Some(callback) => {
+                        /*let callback: &mut Fn(VirtualKey) = mem::transmute(callback_u64);
+                        let virtual_key: VirtualKey = mem::transmute(keyboard_info.vkCode as u8);
+                        callback(virtual_key);
+                        return 1;*/
+                        let virtual_key: VirtualKey = mem::transmute(keyboard_info.vkCode as u8);
+                        callback(virtual_key);
+                        return 1;
+                    },
+                    _ => {
+                        return 1;
+                    }
+                };*/
+                println!("Pressed hotkey {:?}", keyboard_info.vkCode);
+                return 1;
+            }
+
+            if is_win_key {
+                WIN_KEY_DOWN = true;
+                return 1;
+            }
+
+            default_retval()
+        },
+        WM_KEYUP => {
+            if is_win_key(keyboard_info.vkCode) {
+                WIN_KEY_DOWN = false;
+                return 1;
+            }
+
+            default_retval()
+        },
+        _ => { default_retval() }
+    }
+}
+
+pub fn setup_keyboard_hook<F>(callback: &F) 
+    where F: Fn(VirtualKey) {
+    unsafe {
+        if (LOW_LEVEL_KEYBOARD_HOOK != 0) {
+            panic!("setup_keyboard_hook has already been run.");
+        }
+
+        LOW_LEVEL_KEYBOARD_HOOK = SetWindowsHookExA(WH_KEYBOARD_LL, Some(low_level_keyboard_proc), GetModuleHandleA(NULLSTR), 0) as usize;
+
+        if (LOW_LEVEL_KEYBOARD_HOOK == 0) {
+            panic!("failed setting up low level keyboard hook.");
+        }
+
+        //HOTKEY_CALLBACK = Some(callback);
+    }
+}
 
 pub fn create_window(name: &[u8], size: &Vector2) -> WindowHandle {
     let winstr_name = winstr(name);
@@ -43,7 +141,7 @@ pub fn create_window(name: &[u8], size: &Vector2) -> WindowHandle {
             hInstance: instance,
             lpszClassName: winstr_name,
             style: CS_OWNDC,
-            //lpfnWndProc: Some(window_proc),
+            lpfnWndProc: Some(window_proc),
             ..Default::default()
         };
 
@@ -199,5 +297,11 @@ pub fn get_all_current_windows(all_windows: &mut Vec<WindowHandle>)
     unsafe {
         let lparam: LPARAM = mem::transmute(all_windows);
         EnumWindows(Some(callback), lparam);
+    }
+}
+
+pub fn register_hot_key(handle: Option<WindowHandle>, id: c_int, modifiers: c_uint, key: VirtualKey) -> bool {
+    unsafe {
+        return RegisterHotKey(handle.unwrap_or(NULLPTR), id, modifiers, key as u32) == TRUE;
     }
 }

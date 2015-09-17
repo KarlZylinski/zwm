@@ -8,8 +8,10 @@ pub type HINSTANCE = *mut c_void;
 pub type LPVOID = *mut c_void;
 pub type PVOID = *mut c_void;
 pub type LPCSTR = *const c_char;
+pub type HHOOK = *mut c_void;
 pub type WPARAM = c_uint;
 pub type LPARAM = i64;
+pub type ULONG_PTR = u64;
 pub type LRESULT = c_long;
 pub type LONG = c_long;
 pub type BOOL = c_int;
@@ -24,6 +26,9 @@ pub const WS_MINIMIZE: DWORD = 0x20000000;
 pub const WS_MAXIMIZE: DWORD = 0x01000000;
 pub const WS_SYSMENU: DWORD = 0x00080000;
 pub const WM_NCHITTEST: DWORD = 0x0084;
+pub const WM_HOTKEY: DWORD = 0x0312;
+pub const WM_KEYDOWN: DWORD = 0x0100;
+pub const WM_KEYUP: DWORD = 0x0101;
 pub const CS_OWNDC: DWORD = 0x0020;
 pub const PM_REMOVE: c_uint = 0x0001;
 pub const SW_HIDE: c_int = 0x0000;
@@ -37,9 +42,10 @@ pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
 pub const GWL_STYLE: c_int = -16;
 pub const HTCLIENT: LRESULT = 1;
-pub type WNDPROC = Option<unsafe extern "system" fn(
-    HWND, c_uint, WPARAM,LPARAM,
-) -> LRESULT>;
+pub const HC_ACTION: c_int = 0;
+pub const WH_KEYBOARD_LL: c_int = 13;
+pub type WNDPROC = Option<unsafe extern "system" fn(HWND, c_uint, WPARAM,LPARAM) -> LRESULT>;
+pub type HOOKPROC = Option<unsafe extern "system" fn(code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT>;
 pub type WNDENUMPROC = Option<unsafe extern "system" fn(HWND, LPARAM) -> BOOL>;
 
 #[repr(C)]
@@ -59,6 +65,15 @@ pub struct HBRUSH_ {
     pub i: c_int,
 }
 pub type HBRUSH = *mut HBRUSH_;
+
+#[repr(C)] #[allow(non_snake_case)]
+pub struct KBDLLHOOKSTRUCT {
+    pub vkCode: DWORD,
+    pub scanCode: DWORD,
+    pub flags: DWORD,
+    pub time: DWORD,
+    pub dwExtraInfo: ULONG_PTR
+}
 
 #[repr(C)] #[derive(Copy)] #[allow(non_snake_case)]
 pub struct WNDCLASSEXA {
@@ -164,4 +179,7 @@ extern "system" {
     pub fn GetLastActivePopup(hWnd: HWND) -> HWND;
     pub fn GetWindowLongPtrA(hWnd: HWND, nIndex: c_int) -> c_long;
     pub fn SetWindowLongPtrA(hWnd: HWND, nIndex: c_int, dwNewLong: c_long) -> c_long;
+    pub fn RegisterHotKey(hWnd: HWND, id: c_int, fsModifiers: c_uint, vk: c_uint) -> BOOL;
+    pub fn SetWindowsHookExA(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK;
+    pub fn CallNextHookEx(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
 }
