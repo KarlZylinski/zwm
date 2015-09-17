@@ -50,6 +50,7 @@ unsafe extern "system" fn window_proc(window_handle: WindowHandle, msg: c_uint, 
 // Move these things into a Window struct?
 static mut WIN_KEY_DOWN: bool = false;
 static mut LOW_LEVEL_KEYBOARD_HOOK: usize = 0;
+static mut HOTKEY_CALLBACK: Option<*mut Fn(VirtualKey)> = None;
 //static mut HOTKEY_CALLBACK: Option<Fn(VirtualKey)> = None;
 
 unsafe extern "system" fn low_level_keyboard_proc(code: c_int, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -72,21 +73,17 @@ unsafe extern "system" fn low_level_keyboard_proc(code: c_int, wparam: WPARAM, l
             let is_win_key = is_win_key(keyboard_info.vkCode);
 
             if !is_win_key && WIN_KEY_DOWN {
-                /*match HOTKEY_CALLBACK {
+                match HOTKEY_CALLBACK {
                     Some(callback) => {
-                        /*let callback: &mut Fn(VirtualKey) = mem::transmute(callback_u64);
                         let virtual_key: VirtualKey = mem::transmute(keyboard_info.vkCode as u8);
-                        callback(virtual_key);
-                        return 1;*/
-                        let virtual_key: VirtualKey = mem::transmute(keyboard_info.vkCode as u8);
-                        callback(virtual_key);
+                        (*callback)(virtual_key);
                         return 1;
                     },
                     _ => {
                         return 1;
                     }
-                };*/
-                println!("Pressed hotkey {:?}", keyboard_info.vkCode);
+                };
+
                 return 1;
             }
 
@@ -109,9 +106,8 @@ unsafe extern "system" fn low_level_keyboard_proc(code: c_int, wparam: WPARAM, l
     }
 }
 
-pub fn setup_keyboard_hook<F>(callback: &F) 
-    where F: Fn(VirtualKey) {
-    unsafe {
+pub fn setup_keyboard_hook(callback: Box<Fn(VirtualKey)>) {
+    unsafe {        
         if (LOW_LEVEL_KEYBOARD_HOOK != 0) {
             panic!("setup_keyboard_hook has already been run.");
         }
@@ -122,7 +118,7 @@ pub fn setup_keyboard_hook<F>(callback: &F)
             panic!("failed setting up low level keyboard hook.");
         }
 
-        //HOTKEY_CALLBACK = Some(callback);
+        HOTKEY_CALLBACK = Some(Box::into_raw(callback));
     }
 }
 
@@ -238,6 +234,16 @@ pub fn process_events() {
     }
 }
 
+pub fn get_console_window() -> Option<WindowHandle> {
+    let console_window = unsafe { GetConsoleWindow() };
+
+    return if console_window == NULLPTR {
+        None
+    } else {
+        Some(console_window)
+    }
+}
+
 pub fn set_desktop_work_area(rect: &Rect) {
     unsafe {
         let mut win_rect = RECT {
@@ -289,7 +295,7 @@ pub fn get_all_current_windows(all_windows: &mut Vec<WindowHandle>)
         if hwnd_walk != hwnd {
             return TRUE;
         }
-
+        
         windows.push(hwnd);
         return TRUE;
     };

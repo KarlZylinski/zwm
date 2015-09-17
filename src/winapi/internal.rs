@@ -182,4 +182,5 @@ extern "system" {
     pub fn RegisterHotKey(hWnd: HWND, id: c_int, fsModifiers: c_uint, vk: c_uint) -> BOOL;
     pub fn SetWindowsHookExA(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK;
     pub fn CallNextHookEx(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
+    pub fn GetConsoleWindow() -> HWND;
 }
